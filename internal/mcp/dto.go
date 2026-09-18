@@ -1,7 +1,5 @@
 package mcp
 
-import "encoding/json"
-
 type InstanceIn struct {
 	Instance string `json:"instance,omitempty" jsonschema:"Jira instance alias from config. Omit for default."`
 }
@@ -27,6 +25,20 @@ type LogTimeIn struct {
 	DryRun          bool   `json:"dryRun,omitempty" jsonschema:"Return the Tempo request without creating a worklog."`
 }
 
+type LogTimeBulkIn struct {
+	Instance string           `json:"instance,omitempty" jsonschema:"Jira instance alias from config. Omit for default."`
+	DryRun   bool             `json:"dryRun,omitempty" jsonschema:"Return Tempo requests without creating worklogs."`
+	Entries  []LogTimeEntryIn `json:"entries" jsonschema:"Worklogs to create."`
+}
+
+type LogTimeEntryIn struct {
+	IssueKey        string `json:"issueKey" jsonschema:"Jira issue key, for example PROJ-123."`
+	Date            string `json:"date" jsonschema:"Worklog date in YYYY-MM-DD format."`
+	Seconds         int    `json:"seconds" jsonschema:"Time spent in seconds."`
+	Comment         string `json:"comment" jsonschema:"Worklog comment."`
+	BillableSeconds *int   `json:"billableSeconds,omitempty" jsonschema:"Billable time in seconds. Omit to use instance default."`
+}
+
 type WhoAmIOut struct {
 	Instance       string `json:"instance"`
 	Name           string `json:"name,omitempty"`
@@ -36,10 +48,11 @@ type WhoAmIOut struct {
 }
 
 type IssueOut struct {
-	ID      string `json:"id"`
-	Key     string `json:"key"`
-	Summary string `json:"summary"`
-	Status  string `json:"status"`
+	ID          string `json:"id"`
+	Key         string `json:"key"`
+	Summary     string `json:"summary"`
+	Description string `json:"description,omitempty"`
+	Status      string `json:"status"`
 }
 
 type ListIssuesOut struct {
@@ -73,6 +86,23 @@ type LogTimeOut struct {
 	Instance string          `json:"instance"`
 	Endpoint string          `json:"endpoint"`
 	Request  TempoWorklogOut `json:"request"`
-	Response json.RawMessage `json:"response,omitempty"`
+	Response any             `json:"response,omitempty"`
 	DryRun   bool            `json:"dryRun"`
+}
+
+type LogTimeBulkOut struct {
+	Instance  string                `json:"instance"`
+	Total     int                   `json:"total"`
+	Succeeded int                   `json:"succeeded"`
+	Failed    int                   `json:"failed"`
+	DryRun    bool                  `json:"dryRun"`
+	Entries   []LogTimeBulkEntryOut `json:"entries"`
+}
+
+type LogTimeBulkEntryOut struct {
+	Index    int         `json:"index"`
+	IssueKey string      `json:"issueKey"`
+	Success  bool        `json:"success"`
+	Error    string      `json:"error,omitempty"`
+	Result   *LogTimeOut `json:"result,omitempty"`
 }

@@ -54,8 +54,9 @@ type Issue struct {
 	ID     string `json:"id"`
 	Key    string `json:"key"`
 	Fields struct {
-		Summary string `json:"summary"`
-		Status  struct {
+		Summary     string `json:"summary"`
+		Description string `json:"description"`
+		Status      struct {
 			Name string `json:"name"`
 		} `json:"status"`
 	} `json:"fields"`
