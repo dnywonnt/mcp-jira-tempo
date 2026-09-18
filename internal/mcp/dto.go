@@ -19,7 +19,9 @@ type LogTimeIn struct {
 	Instance        string `json:"instance,omitempty" jsonschema:"Jira instance alias from config. Omit for default."`
 	IssueKey        string `json:"issueKey" jsonschema:"Jira issue key, for example PROJ-123."`
 	Date            string `json:"date" jsonschema:"Worklog date in YYYY-MM-DD format."`
-	Seconds         int    `json:"seconds" jsonschema:"Time spent in seconds."`
+	Seconds         int    `json:"seconds,omitempty" jsonschema:"Time spent in seconds. Required unless startTime/endTime is provided."`
+	StartTime       string `json:"startTime,omitempty" jsonschema:"Worklog start time in HH:MM format. Can be used with either endTime or seconds."`
+	EndTime         string `json:"endTime,omitempty" jsonschema:"Worklog end time in HH:MM format. Use together with startTime."`
 	Comment         string `json:"comment" jsonschema:"Worklog comment."`
 	BillableSeconds *int   `json:"billableSeconds,omitempty" jsonschema:"Billable time in seconds. Omit to use instance default."`
 	DryRun          bool   `json:"dryRun,omitempty" jsonschema:"Return the Tempo request without creating a worklog."`
@@ -34,7 +36,9 @@ type LogTimeBulkIn struct {
 type LogTimeEntryIn struct {
 	IssueKey        string `json:"issueKey" jsonschema:"Jira issue key, for example PROJ-123."`
 	Date            string `json:"date" jsonschema:"Worklog date in YYYY-MM-DD format."`
-	Seconds         int    `json:"seconds" jsonschema:"Time spent in seconds."`
+	Seconds         int    `json:"seconds,omitempty" jsonschema:"Time spent in seconds. Required unless startTime/endTime is provided."`
+	StartTime       string `json:"startTime,omitempty" jsonschema:"Worklog start time in HH:MM format. Can be used with either endTime or seconds."`
+	EndTime         string `json:"endTime,omitempty" jsonschema:"Worklog end time in HH:MM format. Use together with startTime."`
 	Comment         string `json:"comment" jsonschema:"Worklog comment."`
 	BillableSeconds *int   `json:"billableSeconds,omitempty" jsonschema:"Billable time in seconds. Omit to use instance default."`
 }
