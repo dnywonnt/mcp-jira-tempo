@@ -34,7 +34,13 @@ export JIRA_TOKEN="your-token"
 Запуск:
 
 ```bash
-go run ./cmd
+go run ./cmd/mcp-jira-tempo
+```
+
+Установка через `go install`:
+
+```bash
+go install github.com/dnywonnt/mcp-jira-tempo/cmd/mcp-jira-tempo@latest
 ```
 
 ### Переменные окружения
