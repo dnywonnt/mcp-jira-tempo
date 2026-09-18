@@ -24,10 +24,10 @@ const (
 	pathSearch        = "/rest/api/2/search"
 	pathTempoWorklogs = "/rest/tempo-timesheets/4/worklogs"
 
-	issueFieldsSummaryStatus = "summary,status"
-	defaultIssueListJQL      = "assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC"
-	defaultIssueListMax      = 50
-	issueListMaxLimit        = 100
+	issueFields         = "summary,status,description"
+	defaultIssueListJQL = "assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC"
+	defaultIssueListMax = 50
+	issueListMaxLimit   = 100
 
 	headerAuthorization = "Authorization"
 	headerAccept        = "Accept"
@@ -320,14 +320,14 @@ func (c *Client) do(ctx context.Context, inst config.Instance, method, path stri
 
 func issuePath(issueKey string) string {
 	values := url.Values{}
-	values.Set("fields", issueFieldsSummaryStatus)
+	values.Set("fields", issueFields)
 	return "/rest/api/2/issue/" + url.PathEscape(issueKey) + "?" + values.Encode()
 }
 
 func searchPath(jql string, maxResults int) string {
 	values := url.Values{}
 	values.Set("jql", jql)
-	values.Set("fields", issueFieldsSummaryStatus)
+	values.Set("fields", issueFields)
 	values.Set("maxResults", strconv.Itoa(maxResults))
 	return pathSearch + "?" + values.Encode()
 }

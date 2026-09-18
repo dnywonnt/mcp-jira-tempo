@@ -80,10 +80,10 @@ func TestClientGetIssue(t *testing.T) {
 			key:  "PROJ-123",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				requireRequest(t, r, http.MethodGet, "/rest/api/2/issue/PROJ-123")
-				require.Equal(t, issueFieldsSummaryStatus, r.URL.Query().Get("fields"))
-				writeIssue(t, w, http.StatusOK, "10001", "PROJ-123", "Build Jira MCP", "In Progress")
+				require.Equal(t, issueFields, r.URL.Query().Get("fields"))
+				writeIssue(t, w, http.StatusOK, "10001", "PROJ-123", "Build Jira MCP", "Issue description", "In Progress")
 			},
-			want: issueFromPayload(t, "10001", "PROJ-123", "Build Jira MCP", "In Progress"),
+			want: issueFromPayload(t, "10001", "PROJ-123", "Build Jira MCP", "Issue description", "In Progress"),
 		},
 		{
 			name:    "requires issue key",
@@ -159,7 +159,7 @@ func TestClientListIssues(t *testing.T) {
 				handler = func(w http.ResponseWriter, r *http.Request) {
 					requireRequest(t, r, http.MethodGet, pathSearch)
 					require.Equal(t, tt.wantJQL, r.URL.Query().Get("jql"))
-					require.Equal(t, issueFieldsSummaryStatus, r.URL.Query().Get("fields"))
+					require.Equal(t, issueFields, r.URL.Query().Get("fields"))
 					require.Equal(t, tt.wantMaxResults, r.URL.Query().Get("maxResults"))
 
 					writeJSON(t, w, http.StatusOK, map[string]any{
@@ -167,7 +167,7 @@ func TestClientListIssues(t *testing.T) {
 						"maxResults": 1,
 						"total":      1,
 						"issues": []any{
-							issuePayload("10001", "PROJ-123", "Build Jira MCP", "To Do"),
+							issuePayload("10001", "PROJ-123", "Build Jira MCP", "Issue description", "To Do"),
 						},
 					})
 				}
@@ -402,15 +402,15 @@ func requireRequest(t *testing.T, r *http.Request, method, path string) {
 	require.Equal(t, contentTypeJSON, r.Header.Get(headerAccept))
 }
 
-func writeIssue(t *testing.T, w http.ResponseWriter, status int, id, key, summary, issueStatus string) {
+func writeIssue(t *testing.T, w http.ResponseWriter, status int, id, key, summary, description, issueStatus string) {
 	t.Helper()
-	writeJSON(t, w, status, issuePayload(id, key, summary, issueStatus))
+	writeJSON(t, w, status, issuePayload(id, key, summary, description, issueStatus))
 }
 
-func issueFromPayload(t *testing.T, id, key, summary, issueStatus string) Issue {
+func issueFromPayload(t *testing.T, id, key, summary, description, issueStatus string) Issue {
 	t.Helper()
 
-	raw, err := json.Marshal(issuePayload(id, key, summary, issueStatus))
+	raw, err := json.Marshal(issuePayload(id, key, summary, description, issueStatus))
 	require.NoError(t, err)
 
 	var issue Issue
@@ -418,12 +418,13 @@ func issueFromPayload(t *testing.T, id, key, summary, issueStatus string) Issue 
 	return issue
 }
 
-func issuePayload(id, key, summary, issueStatus string) map[string]any {
+func issuePayload(id, key, summary, description, issueStatus string) map[string]any {
 	return map[string]any{
 		"id":  id,
 		"key": key,
 		"fields": map[string]any{
-			"summary": summary,
+			"summary":     summary,
+			"description": description,
 			"status": map[string]string{
 				"name": issueStatus,
 			},

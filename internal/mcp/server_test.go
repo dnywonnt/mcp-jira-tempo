@@ -84,13 +84,14 @@ func TestGetIssueHandler(t *testing.T) {
 				t.Helper()
 				client.EXPECT().
 					GetIssue(gomock.Any(), "corp", "PROJ-123").
-					Return(mustIssue(t, "10001", "PROJ-123", "Build MCP", "In Progress"), nil)
+					Return(mustIssue(t, "10001", "PROJ-123", "Build MCP", "Issue description", "In Progress"), nil)
 			},
 			want: IssueOut{
-				ID:      "10001",
-				Key:     "PROJ-123",
-				Summary: "Build MCP",
-				Status:  "In Progress",
+				ID:          "10001",
+				Key:         "PROJ-123",
+				Summary:     "Build MCP",
+				Description: "Issue description",
+				Status:      "In Progress",
 			},
 		},
 		{
@@ -153,8 +154,8 @@ func TestListIssuesHandler(t *testing.T) {
 						MaxResults: 25,
 						Total:      2,
 						Issues: []jira.Issue{
-							mustIssue(t, "10001", "PROJ-123", "Build MCP", "In Progress"),
-							mustIssue(t, "10002", "PROJ-124", "Test MCP", "To Do"),
+							mustIssue(t, "10001", "PROJ-123", "Build MCP", "Build description", "In Progress"),
+							mustIssue(t, "10002", "PROJ-124", "Test MCP", "Test description", "To Do"),
 						},
 					}, nil)
 			},
@@ -165,8 +166,8 @@ func TestListIssuesHandler(t *testing.T) {
 				MaxResults: 25,
 				Total:      2,
 				Issues: []IssueOut{
-					{ID: "10001", Key: "PROJ-123", Summary: "Build MCP", Status: "In Progress"},
-					{ID: "10002", Key: "PROJ-124", Summary: "Test MCP", Status: "To Do"},
+					{ID: "10001", Key: "PROJ-123", Summary: "Build MCP", Description: "Build description", Status: "In Progress"},
+					{ID: "10002", Key: "PROJ-124", Summary: "Test MCP", Description: "Test description", Status: "To Do"},
 				},
 			},
 		},
@@ -297,7 +298,7 @@ func TestLogTimeHandler(t *testing.T) {
 						BillableSeconds: &billableSeconds,
 						DryRun:          true,
 					}).
-					Return(mustLogTimeResult(t), nil)
+					Return(mustLogTimeResult(t, `{"id":"worklog-1"}`), nil)
 			},
 			want: LogTimeOut{
 				Instance: "corp",
@@ -313,6 +314,42 @@ func TestLogTimeHandler(t *testing.T) {
 				DryRun: true,
 			},
 			wantResponse: `{"id":"worklog-1"}`,
+		},
+		{
+			name: "array response",
+			input: LogTimeIn{
+				Instance: "corp",
+				IssueKey: "PROJ-123",
+				Date:     "2026-09-18",
+				Seconds:  3600,
+				Comment:  "Build MCP",
+			},
+			setup: func(t *testing.T, client *MockJiraClient) {
+				t.Helper()
+				client.EXPECT().
+					LogTime(gomock.Any(), jira.LogTimeRequest{
+						Instance: "corp",
+						IssueKey: "PROJ-123",
+						Date:     "2026-09-18",
+						Seconds:  3600,
+						Comment:  "Build MCP",
+					}).
+					Return(mustLogTimeResult(t, `[{"tempoWorklogId":353650,"timeSpentSeconds":300,"comment":"тест"}]`), nil)
+			},
+			want: LogTimeOut{
+				Instance: "corp",
+				Endpoint: "https://jira.example.test/rest/tempo-timesheets/4/worklogs",
+				Request: TempoWorklogOut{
+					TimeSpentSeconds: 3600,
+					BillableSeconds:  1800,
+					Started:          "2026-09-18",
+					Comment:          "Build MCP",
+					Worker:           "worker-1",
+					OriginTaskID:     "PROJ-123",
+				},
+				DryRun: true,
+			},
+			wantResponse: `[{"tempoWorklogId":353650,"timeSpentSeconds":300,"comment":"тест"}]`,
 		},
 		{
 			name:  "error",
@@ -342,19 +379,138 @@ func TestLogTimeHandler(t *testing.T) {
 			response := out.Response
 			out.Response = nil
 			require.Equal(t, tt.want, out)
-			require.JSONEq(t, tt.wantResponse, string(response))
+			responseJSON, err := json.Marshal(response)
+			require.NoError(t, err)
+			require.JSONEq(t, tt.wantResponse, string(responseJSON))
 		})
 	}
 }
 
-func mustIssue(t *testing.T, id, key, summary, status string) jira.Issue {
+func TestLogTimeBulkHandler(t *testing.T) {
+	billableSeconds := 1800
+
+	tests := []struct {
+		name    string
+		input   LogTimeBulkIn
+		setup   func(t *testing.T, client *MockJiraClient)
+		want    LogTimeBulkOut
+		wantErr string
+	}{
+		{
+			name: "partial success",
+			input: LogTimeBulkIn{
+				Instance: "corp",
+				DryRun:   true,
+				Entries: []LogTimeEntryIn{
+					{
+						IssueKey:        "PROJ-123",
+						Date:            "2026-09-18",
+						Seconds:         3600,
+						Comment:         "Build MCP",
+						BillableSeconds: &billableSeconds,
+					},
+					{
+						IssueKey: "PROJ-124",
+						Date:     "2026-09-18",
+						Seconds:  1800,
+						Comment:  "Test MCP",
+					},
+				},
+			},
+			setup: func(t *testing.T, client *MockJiraClient) {
+				t.Helper()
+				client.EXPECT().
+					LogTime(gomock.Any(), jira.LogTimeRequest{
+						Instance:        "corp",
+						IssueKey:        "PROJ-123",
+						Date:            "2026-09-18",
+						Seconds:         3600,
+						Comment:         "Build MCP",
+						BillableSeconds: &billableSeconds,
+						DryRun:          true,
+					}).
+					Return(mustLogTimeResult(t, `{"id":"worklog-1"}`), nil)
+				client.EXPECT().
+					LogTime(gomock.Any(), jira.LogTimeRequest{
+						Instance: "corp",
+						IssueKey: "PROJ-124",
+						Date:     "2026-09-18",
+						Seconds:  1800,
+						Comment:  "Test MCP",
+						DryRun:   true,
+					}).
+					Return(jira.LogTimeResult{}, errors.New("boom"))
+			},
+			want: LogTimeBulkOut{
+				Instance:  "corp",
+				Total:     2,
+				Succeeded: 1,
+				Failed:    1,
+				DryRun:    true,
+				Entries: []LogTimeBulkEntryOut{
+					{
+						Index:    0,
+						IssueKey: "PROJ-123",
+						Success:  true,
+						Result: &LogTimeOut{
+							Instance: "corp",
+							Endpoint: "https://jira.example.test/rest/tempo-timesheets/4/worklogs",
+							Request: TempoWorklogOut{
+								TimeSpentSeconds: 3600,
+								BillableSeconds:  1800,
+								Started:          "2026-09-18",
+								Comment:          "Build MCP",
+								Worker:           "worker-1",
+								OriginTaskID:     "PROJ-123",
+							},
+							Response: map[string]any{"id": "worklog-1"},
+							DryRun:   true,
+						},
+					},
+					{
+						Index:    1,
+						IssueKey: "PROJ-124",
+						Error:    "boom",
+					},
+				},
+			},
+		},
+		{
+			name:    "requires entries",
+			input:   LogTimeBulkIn{Instance: "corp"},
+			setup:   func(t *testing.T, client *MockJiraClient) { t.Helper() },
+			wantErr: "tempo_log_time_bulk: entries are required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			client := NewMockJiraClient(ctrl)
+			tt.setup(t, client)
+
+			result, out, err := logTimeBulkHandler(client)(context.Background(), nil, tt.input)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Nil(t, result)
+			require.Equal(t, tt.want, out)
+		})
+	}
+}
+
+func mustIssue(t *testing.T, id, key, summary, description, status string) jira.Issue {
 	t.Helper()
 
 	raw, err := json.Marshal(map[string]any{
 		"id":  id,
 		"key": key,
 		"fields": map[string]any{
-			"summary": summary,
+			"summary":     summary,
+			"description": description,
 			"status": map[string]string{
 				"name": status,
 			},
@@ -367,11 +523,11 @@ func mustIssue(t *testing.T, id, key, summary, status string) jira.Issue {
 	return issue
 }
 
-func mustLogTimeResult(t *testing.T) jira.LogTimeResult {
+func mustLogTimeResult(t *testing.T, response string) jira.LogTimeResult {
 	t.Helper()
 
 	var result jira.LogTimeResult
-	require.NoError(t, json.Unmarshal([]byte(`{
+	raw := []byte(`{
 		"instance": "corp",
 		"endpoint": "https://jira.example.test/rest/tempo-timesheets/4/worklogs",
 		"request": {
@@ -382,8 +538,9 @@ func mustLogTimeResult(t *testing.T) jira.LogTimeResult {
 			"worker": "worker-1",
 			"originTaskId": "PROJ-123"
 		},
-		"response": {"id": "worklog-1"},
 		"dryRun": true
-	}`), &result))
+	}`)
+	require.NoError(t, json.Unmarshal(raw, &result))
+	result.Response = json.RawMessage(response)
 	return result
 }
