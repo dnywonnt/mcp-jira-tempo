@@ -25,14 +25,6 @@ const (
 	descriptionLogTime    = "Create a Tempo Timesheets worklog on self-hosted Jira Data Center."
 )
 
-type JiraClient interface {
-	WhoAmI(ctx context.Context, alias string) (jira.User, string, error)
-	GetIssue(ctx context.Context, alias, issueKey string) (jira.Issue, error)
-	ListIssues(ctx context.Context, req jira.ListIssuesRequest) (jira.ListIssuesResult, error)
-	LogTime(ctx context.Context, req jira.LogTimeRequest) (jira.LogTimeResult, error)
-	Health(ctx context.Context, alias string) (jira.HealthResult, error)
-}
-
 func NewServer(client JiraClient) *sdkmcp.Server {
 	server := sdkmcp.NewServer(&sdkmcp.Implementation{
 		Name:    serverName,

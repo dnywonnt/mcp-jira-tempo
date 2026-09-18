@@ -5,6 +5,7 @@ go 1.27.0
 require (
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/stretchr/testify v1.12.1
+	go.uber.org/mock v0.6.0
 )
 
 require (

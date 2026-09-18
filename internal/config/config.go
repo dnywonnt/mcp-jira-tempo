@@ -77,10 +77,10 @@ func Load(environ []string) (Config, error) {
 	if value := strings.TrimSpace(env[envJiraHTTPClientTimeout]); value != "" {
 		timeout, err := time.ParseDuration(value)
 		if err != nil {
-			return Config{}, fmt.Errorf("config: %s: %w", envJiraHTTPClientTimeout, err)
+			return Config{}, fmt.Errorf("%s: %w", envJiraHTTPClientTimeout, err)
 		}
 		if timeout <= 0 {
-			return Config{}, fmt.Errorf("config: %s must be greater than zero", envJiraHTTPClientTimeout)
+			return Config{}, fmt.Errorf("%s must be greater than zero", envJiraHTTPClientTimeout)
 		}
 		cfg.httpClientTimeout = timeout
 	}
@@ -88,10 +88,10 @@ func Load(environ []string) (Config, error) {
 	if value := strings.TrimSpace(env[envJiraMaxResponseBytes]); value != "" {
 		maxBytes, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			return Config{}, fmt.Errorf("config: %s: %w", envJiraMaxResponseBytes, err)
+			return Config{}, fmt.Errorf("%s: %w", envJiraMaxResponseBytes, err)
 		}
 		if maxBytes <= 0 {
-			return Config{}, fmt.Errorf("config: %s must be greater than zero", envJiraMaxResponseBytes)
+			return Config{}, fmt.Errorf("%s must be greater than zero", envJiraMaxResponseBytes)
 		}
 		cfg.maxResponseBytes = maxBytes
 	}
@@ -99,17 +99,17 @@ func Load(environ []string) (Config, error) {
 	for _, alias := range aliases {
 		inst, err := loadInstance(env, alias)
 		if err != nil {
-			return Config{}, err
+			return Config{}, fmt.Errorf("loadInstance: %w", err)
 		}
 		key := normalizeAlias(inst.Alias)
 		if _, exists := cfg.instances[key]; exists {
-			return Config{}, fmt.Errorf("config: duplicate Jira instance alias %q", inst.Alias)
+			return Config{}, fmt.Errorf("duplicate Jira instance alias %q", inst.Alias)
 		}
 		cfg.instances[key] = inst
 	}
 
 	if _, ok := cfg.instances[normalizeAlias(cfg.defaultAlias)]; !ok {
-		return Config{}, fmt.Errorf("config: default Jira instance %q is not configured", cfg.defaultAlias)
+		return Config{}, fmt.Errorf("default Jira instance %q is not configured", cfg.defaultAlias)
 	}
 
 	return cfg, nil
@@ -145,20 +145,20 @@ func (c Config) Instances() []Instance {
 func loadInstance(env map[string]string, alias string) (Instance, error) {
 	alias = strings.TrimSpace(alias)
 	if alias == "" {
-		return Instance{}, errors.New("config: Jira instance alias is required")
+		return Instance{}, errors.New("Jira instance alias is required")
 	}
 
 	baseURL := strings.TrimRight(strings.TrimSpace(instanceEnv(env, alias, "BASE_URL", envJiraBaseURL)), "/")
 	if baseURL == "" {
-		return Instance{}, fmt.Errorf("config: %s is required", instanceEnvName(alias, "BASE_URL", envJiraBaseURL))
+		return Instance{}, fmt.Errorf("%s is required", instanceEnvName(alias, "BASE_URL", envJiraBaseURL))
 	}
 	if err := validateBaseURL(baseURL); err != nil {
-		return Instance{}, fmt.Errorf("config: %s: %w", instanceEnvName(alias, "BASE_URL", envJiraBaseURL), err)
+		return Instance{}, fmt.Errorf("validateBaseURL: %w", err)
 	}
 
 	token := strings.TrimSpace(instanceEnv(env, alias, "TOKEN", envJiraToken))
 	if token == "" {
-		return Instance{}, fmt.Errorf("config: %s is required", instanceEnvName(alias, "TOKEN", envJiraToken))
+		return Instance{}, fmt.Errorf("%s is required", instanceEnvName(alias, "TOKEN", envJiraToken))
 	}
 
 	workerField := strings.TrimSpace(instanceEnv(env, alias, "WORKER_FIELD", envJiraWorkerField))
@@ -166,12 +166,12 @@ func loadInstance(env map[string]string, alias string) (Instance, error) {
 		workerField = WorkerFieldKey
 	}
 	if workerField != WorkerFieldKey && workerField != WorkerFieldName {
-		return Instance{}, fmt.Errorf("config: %s must be %q or %q", instanceEnvName(alias, "WORKER_FIELD", envJiraWorkerField), WorkerFieldKey, WorkerFieldName)
+		return Instance{}, fmt.Errorf("%s must be %q or %q", instanceEnvName(alias, "WORKER_FIELD", envJiraWorkerField), WorkerFieldKey, WorkerFieldName)
 	}
 
 	billableByDefault, err := parseOptionalBool(instanceEnv(env, alias, "BILLABLE_BY_DEFAULT", envJiraBillableDefault))
 	if err != nil {
-		return Instance{}, fmt.Errorf("config: %s: %w", instanceEnvName(alias, "BILLABLE_BY_DEFAULT", envJiraBillableDefault), err)
+		return Instance{}, fmt.Errorf("parseOptionalBool: %w", err)
 	}
 
 	return Instance{
