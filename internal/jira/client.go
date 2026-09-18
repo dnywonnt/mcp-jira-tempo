@@ -194,7 +194,7 @@ func (c *Client) LogTime(ctx context.Context, req LogTimeRequest) (LogTimeResult
 func resolveWorklogTiming(req LogTimeRequest) (int, string, error) {
 	date, err := time.Parse(dateLayout, req.Date)
 	if err != nil {
-		return 0, "", fmt.Errorf("parse date: %w", err)
+		return 0, "", fmt.Errorf("time.Parse: %w", err)
 	}
 
 	startTime := strings.TrimSpace(req.StartTime)
