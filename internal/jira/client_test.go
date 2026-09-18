@@ -295,7 +295,7 @@ func TestClientLogTime(t *testing.T) {
 				Date:     "2026-09-18",
 			},
 			handler: failOnRequest(t),
-			wantErr: "seconds must be greater than zero",
+			wantErr: "resolveWorklogTiming: seconds must be greater than zero",
 		},
 		{
 			name: "rejects start time without duration",
@@ -305,7 +305,7 @@ func TestClientLogTime(t *testing.T) {
 				StartTime: "09:00",
 			},
 			handler: failOnRequest(t),
-			wantErr: "seconds must be greater than zero when endTime is omitted",
+			wantErr: "resolveWorklogTiming: seconds must be greater than zero when endTime is omitted",
 		},
 		{
 			name: "rejects end time without start time",
@@ -315,7 +315,7 @@ func TestClientLogTime(t *testing.T) {
 				EndTime:  "10:00",
 			},
 			handler: failOnRequest(t),
-			wantErr: "startTime is required when endTime is provided",
+			wantErr: "resolveWorklogTiming: startTime is required when endTime is provided",
 		},
 		{
 			name: "rejects time range seconds mismatch",
@@ -327,7 +327,7 @@ func TestClientLogTime(t *testing.T) {
 				EndTime:   "10:00",
 			},
 			handler: failOnRequest(t),
-			wantErr: "seconds must match time range duration: got 1800, want 3600",
+			wantErr: "resolveWorklogTiming: seconds must match time range duration: got 1800, want 3600",
 		},
 	}
 

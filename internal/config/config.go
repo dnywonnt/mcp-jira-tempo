@@ -77,7 +77,7 @@ func Load(environ []string) (Config, error) {
 	if value := strings.TrimSpace(env[envJiraHTTPClientTimeout]); value != "" {
 		timeout, err := time.ParseDuration(value)
 		if err != nil {
-			return Config{}, fmt.Errorf("%s: %w", envJiraHTTPClientTimeout, err)
+			return Config{}, fmt.Errorf("time.ParseDuration: %w", err)
 		}
 		if timeout <= 0 {
 			return Config{}, fmt.Errorf("%s must be greater than zero", envJiraHTTPClientTimeout)
@@ -88,7 +88,7 @@ func Load(environ []string) (Config, error) {
 	if value := strings.TrimSpace(env[envJiraMaxResponseBytes]); value != "" {
 		maxBytes, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			return Config{}, fmt.Errorf("%s: %w", envJiraMaxResponseBytes, err)
+			return Config{}, fmt.Errorf("strconv.ParseInt: %w", err)
 		}
 		if maxBytes <= 0 {
 			return Config{}, fmt.Errorf("%s must be greater than zero", envJiraMaxResponseBytes)
