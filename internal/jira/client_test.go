@@ -200,6 +200,8 @@ func TestClientLogTime(t *testing.T) {
 		req                LogTimeRequest
 		handler            http.HandlerFunc
 		wantBillableSecond int
+		wantSeconds        int
+		wantStarted        string
 		wantDryRun         bool
 		wantErr            string
 	}{
@@ -212,6 +214,8 @@ func TestClientLogTime(t *testing.T) {
 				Comment:  "Work on MCP",
 			},
 			wantBillableSecond: 3600,
+			wantSeconds:        3600,
+			wantStarted:        "2026-09-18",
 		},
 		{
 			name: "uses request billable seconds",
@@ -223,6 +227,34 @@ func TestClientLogTime(t *testing.T) {
 				BillableSeconds: new(1800),
 			},
 			wantBillableSecond: 1800,
+			wantSeconds:        3600,
+			wantStarted:        "2026-09-18",
+		},
+		{
+			name: "uses start and end time",
+			req: LogTimeRequest{
+				IssueKey:  "PROJ-123",
+				Date:      "2026-09-18",
+				StartTime: "09:30",
+				EndTime:   "11:00",
+				Comment:   "Work by time range",
+			},
+			wantBillableSecond: 5400,
+			wantSeconds:        5400,
+			wantStarted:        "2026-09-18T09:30:00.000",
+		},
+		{
+			name: "uses start time and seconds",
+			req: LogTimeRequest{
+				IssueKey:  "PROJ-123",
+				Date:      "2026-09-18",
+				Seconds:   7200,
+				StartTime: "10:00",
+				Comment:   "Work from start time",
+			},
+			wantBillableSecond: 7200,
+			wantSeconds:        7200,
+			wantStarted:        "2026-09-18T10:00:00.000",
 		},
 		{
 			name: "dry run",
@@ -233,8 +265,10 @@ func TestClientLogTime(t *testing.T) {
 				Comment:  "Dry run",
 				DryRun:   true,
 			},
-			handler:    failOnRequest(t),
-			wantDryRun: true,
+			handler:     failOnRequest(t),
+			wantSeconds: 900,
+			wantStarted: "2026-09-18",
+			wantDryRun:  true,
 		},
 		{
 			name: "requires issue key",
@@ -261,7 +295,39 @@ func TestClientLogTime(t *testing.T) {
 				Date:     "2026-09-18",
 			},
 			handler: failOnRequest(t),
-			wantErr: "seconds must be greater than zero",
+			wantErr: "resolveWorklogTiming: seconds must be greater than zero",
+		},
+		{
+			name: "rejects start time without duration",
+			req: LogTimeRequest{
+				IssueKey:  "PROJ-123",
+				Date:      "2026-09-18",
+				StartTime: "09:00",
+			},
+			handler: failOnRequest(t),
+			wantErr: "resolveWorklogTiming: seconds must be greater than zero when endTime is omitted",
+		},
+		{
+			name: "rejects end time without start time",
+			req: LogTimeRequest{
+				IssueKey: "PROJ-123",
+				Date:     "2026-09-18",
+				EndTime:  "10:00",
+			},
+			handler: failOnRequest(t),
+			wantErr: "resolveWorklogTiming: startTime is required when endTime is provided",
+		},
+		{
+			name: "rejects time range seconds mismatch",
+			req: LogTimeRequest{
+				IssueKey:  "PROJ-123",
+				Date:      "2026-09-18",
+				Seconds:   1800,
+				StartTime: "09:00",
+				EndTime:   "10:00",
+			},
+			handler: failOnRequest(t),
+			wantErr: "resolveWorklogTiming: seconds must match time range duration: got 1800, want 3600",
 		},
 	}
 
@@ -275,9 +341,9 @@ func TestClientLogTime(t *testing.T) {
 
 					var worklog tempoWorklog
 					require.NoError(t, json.NewDecoder(r.Body).Decode(&worklog))
-					require.Equal(t, tt.req.Seconds, worklog.TimeSpentSeconds)
+					require.Equal(t, tt.wantSeconds, worklog.TimeSpentSeconds)
 					require.Equal(t, tt.wantBillableSecond, worklog.BillableSeconds)
-					require.Equal(t, tt.req.Date, worklog.Started)
+					require.Equal(t, tt.wantStarted, worklog.Started)
 					require.Equal(t, tt.req.Comment, worklog.Comment)
 					require.Equal(t, "worker-1", worklog.Worker)
 					require.Equal(t, tt.req.IssueKey, worklog.OriginTaskID)
@@ -301,6 +367,8 @@ func TestClientLogTime(t *testing.T) {
 			require.Equal(t, config.DefaultAlias, result.Instance)
 			require.Equal(t, server.URL+pathTempoWorklogs, result.Endpoint)
 			require.Equal(t, "worker-1", result.Request.Worker)
+			require.Equal(t, tt.wantSeconds, result.Request.TimeSpentSeconds)
+			require.Equal(t, tt.wantStarted, result.Request.Started)
 			if tt.wantDryRun {
 				require.Empty(t, result.Response)
 				return

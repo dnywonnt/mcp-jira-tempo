@@ -18,7 +18,9 @@ import (
 )
 
 const (
-	dateLayout = "2006-01-02"
+	dateLayout        = "2006-01-02"
+	timeLayout        = "15:04"
+	startedTimeLayout = "2006-01-02T15:04:05.000"
 
 	pathMyself        = "/rest/api/2/myself"
 	pathSearch        = "/rest/api/2/search"
@@ -146,11 +148,9 @@ func (c *Client) LogTime(ctx context.Context, req LogTimeRequest) (LogTimeResult
 	if strings.TrimSpace(req.Date) == "" {
 		return LogTimeResult{}, errors.New("date is required")
 	}
-	if req.Seconds <= 0 {
-		return LogTimeResult{}, errors.New("seconds must be greater than zero")
-	}
-	if _, err := time.Parse(dateLayout, req.Date); err != nil {
-		return LogTimeResult{}, fmt.Errorf("parse date: %w", err)
+	seconds, started, err := resolveWorklogTiming(req)
+	if err != nil {
+		return LogTimeResult{}, fmt.Errorf("resolveWorklogTiming: %w", err)
 	}
 
 	worker, err := c.resolveWorker(ctx, inst, User{})
@@ -162,13 +162,13 @@ func (c *Client) LogTime(ctx context.Context, req LogTimeRequest) (LogTimeResult
 	if req.BillableSeconds != nil {
 		billableSeconds = *req.BillableSeconds
 	} else if inst.BillableByDefault {
-		billableSeconds = req.Seconds
+		billableSeconds = seconds
 	}
 
 	worklog := tempoWorklog{
-		TimeSpentSeconds: req.Seconds,
+		TimeSpentSeconds: seconds,
 		BillableSeconds:  billableSeconds,
-		Started:          req.Date,
+		Started:          started,
 		Comment:          req.Comment,
 		Worker:           worker,
 		OriginTaskID:     req.IssueKey,
@@ -189,6 +189,54 @@ func (c *Client) LogTime(ctx context.Context, req LogTimeRequest) (LogTimeResult
 	}
 	result.Response = body
 	return result, nil
+}
+
+func resolveWorklogTiming(req LogTimeRequest) (int, string, error) {
+	date, err := time.Parse(dateLayout, req.Date)
+	if err != nil {
+		return 0, "", fmt.Errorf("time.Parse: %w", err)
+	}
+
+	startTime := strings.TrimSpace(req.StartTime)
+	endTime := strings.TrimSpace(req.EndTime)
+	if startTime == "" && endTime == "" {
+		if req.Seconds <= 0 {
+			return 0, "", errors.New("seconds must be greater than zero")
+		}
+		return req.Seconds, req.Date, nil
+	}
+	if startTime == "" {
+		return 0, "", errors.New("startTime is required when endTime is provided")
+	}
+
+	start, err := time.Parse(timeLayout, startTime)
+	if err != nil {
+		return 0, "", fmt.Errorf("time.Parse: %w", err)
+	}
+	startedAt := time.Date(date.Year(), date.Month(), date.Day(), start.Hour(), start.Minute(), 0, 0, time.UTC)
+	if endTime == "" {
+		if req.Seconds <= 0 {
+			return 0, "", errors.New("seconds must be greater than zero when endTime is omitted")
+		}
+		return req.Seconds, startedAt.Format(startedTimeLayout), nil
+	}
+
+	end, err := time.Parse(timeLayout, endTime)
+	if err != nil {
+		return 0, "", fmt.Errorf("time.Parse: %w", err)
+	}
+
+	endedAt := time.Date(date.Year(), date.Month(), date.Day(), end.Hour(), end.Minute(), 0, 0, time.UTC)
+	if !endedAt.After(startedAt) {
+		return 0, "", errors.New("endTime must be after startTime")
+	}
+
+	seconds := int(endedAt.Sub(startedAt).Seconds())
+	if req.Seconds > 0 && req.Seconds != seconds {
+		return 0, "", fmt.Errorf("seconds must match time range duration: got %d, want %d", req.Seconds, seconds)
+	}
+
+	return seconds, startedAt.Format(startedTimeLayout), nil
 }
 
 func (c *Client) Health(ctx context.Context, alias string) (HealthResult, error) {
@@ -273,7 +321,7 @@ func (c *Client) getJSON(ctx context.Context, inst config.Instance, path string,
 		return nil
 	}
 	if err := json.Unmarshal(body, target); err != nil {
-		return fmt.Errorf("decode response: %w", err)
+		return fmt.Errorf("json.Unmarshal: %w", err)
 	}
 	return nil
 }
@@ -281,7 +329,7 @@ func (c *Client) getJSON(ctx context.Context, inst config.Instance, path string,
 func (c *Client) postJSON(ctx context.Context, inst config.Instance, path string, payload any) (json.RawMessage, error) {
 	bodyBytes, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("encode request: %w", err)
+		return nil, fmt.Errorf("json.Marshal: %w", err)
 	}
 
 	status, body, err := c.do(ctx, inst, http.MethodPost, path, bodyBytes)
@@ -297,7 +345,7 @@ func (c *Client) postJSON(ctx context.Context, inst config.Instance, path string
 func (c *Client) do(ctx context.Context, inst config.Instance, method, path string, body []byte) (int, []byte, error) {
 	req, err := http.NewRequestWithContext(ctx, method, inst.BaseURL+path, bytes.NewReader(body))
 	if err != nil {
-		return 0, nil, fmt.Errorf("create request: %w", err)
+		return 0, nil, fmt.Errorf("http.NewRequestWithContext: %w", err)
 	}
 	req.Header.Set(headerAuthorization, bearerPrefix+inst.Token)
 	req.Header.Set(headerAccept, contentTypeJSON)
@@ -307,13 +355,13 @@ func (c *Client) do(ctx context.Context, inst config.Instance, method, path stri
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, fmt.Errorf("c.http.Do: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, c.cfg.MaxResponseBytes()))
 	if err != nil {
-		return 0, nil, fmt.Errorf("read response: %w", err)
+		return 0, nil, fmt.Errorf("io.ReadAll: %w", err)
 	}
 	return resp.StatusCode, respBody, nil
 }

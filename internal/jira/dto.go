@@ -7,6 +7,8 @@ type LogTimeRequest struct {
 	IssueKey        string
 	Date            string
 	Seconds         int
+	StartTime       string
+	EndTime         string
 	Comment         string
 	BillableSeconds *int
 	DryRun          bool

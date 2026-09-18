@@ -154,6 +154,32 @@ assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC
 }
 ```
 
+Можно указать время начала вместе с длительностью:
+
+```json
+{
+  "instance": "bk",
+  "issueKey": "APPSUP-1575",
+  "date": "2026-09-18",
+  "startTime": "10:00",
+  "seconds": 7200,
+  "comment": "разработка"
+}
+```
+
+Или передать время начала и окончания. Длительность будет рассчитана автоматически, а в Tempo поле `started` уйдет с датой и временем.
+
+```json
+{
+  "instance": "bk",
+  "issueKey": "APPSUP-1575",
+  "date": "2026-09-18",
+  "startTime": "09:30",
+  "endTime": "11:00",
+  "comment": "разработка"
+}
+```
+
 ### `tempo_log_time_bulk`
 
 Создает несколько Tempo worklog последовательно.
@@ -168,6 +194,7 @@ assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC
     {
       "issueKey": "APPSUP-1575",
       "date": "2026-09-18",
+      "startTime": "09:30",
       "seconds": 300,
       "comment": "тест"
     },
